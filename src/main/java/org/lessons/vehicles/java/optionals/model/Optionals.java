@@ -23,7 +23,13 @@ public class Optionals {
 
     @NotBlank(message = "This field cannot be blank, null or empty, and must be  min 3 char and max 100 char")
     @Size(min = 3, max = 100)
-    private String name;
+    @Column(name = "name_it", nullable = false)
+    private String nameIt;
+
+    @NotBlank(message = "This field cannot be blank, null or empty, and must be  min 3 char and max 100 char")
+    @Size(min = 3, max = 100)
+    @Column(name = "name_En", nullable = false)
+    private String nameEn;
 
     @NotNull(message = "The capacity must be declared, and must be min 1")
     @Min(value = 1, message = "The capacity must be 1 or more")
@@ -32,8 +38,14 @@ public class Optionals {
     // sara un array
     @NotBlank(message = "This field cannot be blank, null or empty, and must be min 3 char and max 100 char")
     @Size(min = 3, max = 100)
-    @Column(name = "vehicle_type", nullable = false)
-    private String vehicleType;
+    @Column(name = "vehicle_type_it", nullable = false)
+    private String vehicleTypeIt;
+
+    // sara un array
+    @NotBlank(message = "This field cannot be blank, null or empty, and must be min 3 char and max 100 char")
+    @Size(min = 3, max = 100)
+    @Column(name = "vehicle_type_En", nullable = false)
+    private String vehicleTypeEn;
 
     public Integer getId() {
         return this.id;
@@ -43,12 +55,20 @@ public class Optionals {
         this.id = id;
     }
 
-    public String getName() {
-        return this.name;
+    public String getNameIt() {
+        return this.nameIt;
     }
 
-    public void setName(String name) {
-        this.name = name;
+    public void setNameIt(String nameIt) {
+        this.nameIt = nameIt;
+    }
+
+    public String getNameEn() {
+        return this.nameEn;
+    }
+
+    public void setNameEn(String nameEn) {
+        this.nameEn = nameEn;
     }
 
     public BigDecimal getPrice() {
@@ -59,12 +79,20 @@ public class Optionals {
         this.price = price;
     }
 
-    public String getVehicleType() {
-        return this.vehicleType;
+    public String getVehicleTypeIt() {
+        return this.vehicleTypeIt;
     }
 
-    public void setVehicleType(String vehicleType) {
-        this.vehicleType = vehicleType;
+    public void setVehicleTypeIt(String vehicleTypeIt) {
+        this.vehicleTypeIt = vehicleTypeIt;
+    }
+
+    public String getVehicleTypeEn() {
+        return this.vehicleTypeEn;
+    }
+
+    public void setVehicleTypeEn(String vehicleTypeEn) {
+        this.vehicleTypeEn = vehicleTypeEn;
     }
 
 }
