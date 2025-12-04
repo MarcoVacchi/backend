@@ -18,6 +18,5 @@ public class Quoted {
     private BigDecimal finalPrice;
 
     @ManyToOne
-    @JoinColumn(name = "vehicle_id")
     private Vehicle vehicle;
 }

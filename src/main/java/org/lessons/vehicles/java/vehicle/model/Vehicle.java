@@ -63,7 +63,7 @@ public class Vehicle {
     @OneToMany(mappedBy = "vehicle", cascade = CascadeType.REMOVE, orphanRemoval = true)
     private List<VehicleVariation> vehicleVariations = new ArrayList<>();
 
-    @OneToOne
+    @OneToMany
     private List<Quoted> quoted = new ArrayList<>();
 
     public Integer getId() {
