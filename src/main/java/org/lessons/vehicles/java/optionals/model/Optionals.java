@@ -1,12 +1,15 @@
 package org.lessons.vehicles.java.optionals.model;
 
 import java.math.BigDecimal;
+import org.lessons.vehicles.java.quoted.model.Quoted;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -21,12 +24,12 @@ public class Optionals {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @NotBlank(message = "This field cannot be blank, null or empty, and must be  min 3 char and max 100 char")
+    @NotBlank(message = "This field cannot be blank, null or empty, and must be min 3 char and max 100 char")
     @Size(min = 3, max = 100)
     @Column(name = "name_it", nullable = false)
     private String nameIt;
 
-    @NotBlank(message = "This field cannot be blank, null or empty, and must be  min 3 char and max 100 char")
+    @NotBlank(message = "This field cannot be blank, null or empty, and must be min 3 char and max 100 char")
     @Size(min = 3, max = 100)
     @Column(name = "name_En", nullable = false)
     private String nameEn;
@@ -35,17 +38,19 @@ public class Optionals {
     @Min(value = 1, message = "The capacity must be 1 or more")
     private BigDecimal price;
 
-    // sara un array
     @NotBlank(message = "This field cannot be blank, null or empty, and must be min 3 char and max 100 char")
     @Size(min = 3, max = 100)
     @Column(name = "vehicle_type_it", nullable = false)
     private String vehicleTypeIt;
 
-    // sara un array
     @NotBlank(message = "This field cannot be blank, null or empty, and must be min 3 char and max 100 char")
     @Size(min = 3, max = 100)
     @Column(name = "vehicle_type_En", nullable = false)
     private String vehicleTypeEn;
+
+    @ManyToOne
+    @JoinColumn(name = "quoted_id", nullable = true)
+    private Quoted quoted;
 
     public Integer getId() {
         return this.id;
@@ -95,4 +100,11 @@ public class Optionals {
         this.vehicleTypeEn = vehicleTypeEn;
     }
 
+    public Quoted getQuoted() {
+        return this.quoted;
+    }
+
+    public void setQuoted(Quoted quoted) {
+        this.quoted = quoted;
+    }
 }

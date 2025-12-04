@@ -6,7 +6,9 @@ import java.util.List;
 import org.lessons.vehicles.java.vehicleVariation.dto.VehicleVariationDTO;
 
 public record VehicleDTOToQuoted(
-        Integer id,
-        BigDecimal basePice,
-        List<VehicleVariationDTO> vehicleVariations) {
+                Integer id,
+                String brand,
+                String model,
+                BigDecimal basePice,
+                List<VehicleVariationDTO> vehicleVariations) {
 }
