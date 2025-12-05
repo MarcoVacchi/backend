@@ -25,23 +25,34 @@ public class Quoted {
     private List<Optionals> optionals;
 
     public Integer getId() {
-        return id;
+        return this.id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
     }
 
     public BigDecimal getFinalPrice() {
-        return finalPrice;
+        return this.finalPrice;
+    }
+
+    public void setFinalPrice(BigDecimal finalPrice) {
+        this.finalPrice = finalPrice;
     }
 
     public Vehicle getVehicle() {
-        return vehicle;
+        return this.vehicle;
     }
 
-    public List<Vehicle> getVehicles() {
-        return (this.vehicle != null) ? List.of(this.vehicle) : List.of();
+    public void setVehicle(Vehicle vehicle) {
+        this.vehicle = vehicle;
     }
 
     public List<Optionals> getOptionals() {
-        return optionals;
+        return this.optionals;
     }
 
+    public void setOptionals(List<Optionals> optionals) {
+        this.optionals = optionals;
+    }
 }

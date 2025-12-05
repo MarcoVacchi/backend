@@ -32,8 +32,8 @@ public class QuotedRestController {
 
     @PostMapping
     public ResponseEntity<QuotedDTO> createQuoted(@RequestBody QuotedDTO quotedDTO) {
-
-        return new ResponseEntity<>(null, HttpStatus.NOT_IMPLEMENTED);
+        QuotedDTO createdQuoted = quotedService.createQuoted(quotedDTO);
+        return new ResponseEntity<>(createdQuoted, HttpStatus.CREATED);
     }
 
     @PutMapping("/{id}")
