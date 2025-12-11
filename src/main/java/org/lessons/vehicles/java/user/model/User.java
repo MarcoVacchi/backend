@@ -31,7 +31,7 @@ public class User {
 
     @NotBlank(message = "This field cannot be blank, null or empty, and must be  min 3 char and max 100 char")
     @Size(min = 3, max = 100)
-    private String email;
+    private String mail;
 
     @Column(name = "is_first_quotation", nullable = false)
     private boolean isFirstQuotation;
@@ -68,12 +68,12 @@ public class User {
         this.password = password;
     }
 
-    public String getEmail() {
-        return this.email;
+    public String getMail() {
+        return this.mail;
     }
 
-    public void setEmail(String email) {
-        this.email = email;
+    public void setMail(String mail) {
+        this.mail = mail;
     }
 
     public boolean isIsFirstQuotation() {

@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.Year;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.lessons.vehicles.java.optionals.dto.OptionalDTOtoQuoted;
@@ -189,7 +190,7 @@ public class QuotedService {
         Integer userId = quoted.getUser() != null ? quoted.getUser().getId() : null;
         String userName = quoted.getUser() != null ? quoted.getUser().getName() : null;
         String userSurname = quoted.getUser() != null ? quoted.getUser().getSurname() : null;
-        String userMail = quoted.getUser() != null ? quoted.getUser().getEmail() : null;
+        String userMail = quoted.getUser() != null ? quoted.getUser().getMail() : null;
 
         List<VehicleDTOToQuoted> vehicles = List.of();
 
@@ -230,18 +231,16 @@ public class QuotedService {
     private Quoted toEntity(QuotedDTO quotedDTO) {
         Quoted quoted = new Quoted();
 
-        if (quotedDTO.userEmail() != null) {
-            User user = userRepository.findByEmail(quotedDTO.userEmail())
-                    .orElseGet(() -> {
-                        User newUser = new User();
-                        newUser.setName(quotedDTO.userName() != null ? quotedDTO.userName() : "default");
-                        newUser.setSurname(quotedDTO.userSurname() != null ? quotedDTO.userSurname() : "default");
-                        newUser.setEmail(quotedDTO.userEmail() != null ? quotedDTO.userEmail() : "default@email.com");
-                        newUser.setPassword("temporary");
-                        newUser.setIsFirstQuotation(true);
-                        return userRepository.save(newUser);
-                    });
-            quoted.setUser(user);
+        if (quotedDTO.userMail() != null || quotedDTO.userName() != null) {
+            User user = new User();
+            user.setName(quotedDTO.userName() != null ? quotedDTO.userName() : "default");
+            user.setSurname(quotedDTO.userSurname() != null ? quotedDTO.userSurname() : "default");
+            user.setMail(quotedDTO.userMail() != null ? quotedDTO.userMail() : "noemail-" + UUID.randomUUID());
+            user.setPassword("temporary");
+            user.setIsFirstQuotation(true);
+
+            user = userRepository.save(user); // salva
+            quoted.setUser(user); // associa
         }
 
         if (quotedDTO.vehicleDTOToQuoted() != null && !quotedDTO.vehicleDTOToQuoted().isEmpty()) {
@@ -307,7 +306,7 @@ public class QuotedService {
                         User newUser = new User();
                         newUser.setName(quotedDTO.userName() != null ? quotedDTO.userName() : "default");
                         newUser.setSurname(quotedDTO.userSurname() != null ? quotedDTO.userSurname() : "default");
-                        newUser.setEmail(quotedDTO.userEmail() != null ? quotedDTO.userEmail() : "default@email.com");
+                        newUser.setMail(quotedDTO.userMail() != null ? quotedDTO.userMail() : "default@email.com");
                         newUser.setPassword("temporary");
                         newUser.setIsFirstQuotation(true);
                         return userRepository.save(newUser);
