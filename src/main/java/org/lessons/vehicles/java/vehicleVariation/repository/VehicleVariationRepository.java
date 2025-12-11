@@ -1,5 +1,8 @@
 package org.lessons.vehicles.java.vehicleVariation.repository;
 
-public class VehicleVariationRepository {
+import org.lessons.vehicles.java.vehicleVariation.model.VehicleVariation;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface VehicleVariationRepository extends JpaRepository<VehicleVariation, Integer> {
 
 }

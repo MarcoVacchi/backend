@@ -62,6 +62,7 @@ public class VehicleService {
 
     private VehicleVariationDTO toVariationDTO(VehicleVariation var) {
         return new VehicleVariationDTO(
+                var.getId(),
                 var.getCc(),
                 var.getImmatricolationMonth(),
                 var.getImmatricolationYear(),

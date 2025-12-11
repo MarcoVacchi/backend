@@ -7,10 +7,9 @@ import org.lessons.vehicles.java.optionals.dto.OptionalDTOtoQuoted;
 import org.lessons.vehicles.java.vehicle.dto.VehicleDTOToQuoted;
 
 public record QuotedDTO(
-        List<VehicleDTOToQuoted> vehicleDTOToQuoted,
-        List<OptionalDTOtoQuoted> optionalDTOtoQuoted,
-        BigDecimal finalPrice
-
-) {
+                List<VehicleDTOToQuoted> vehicleDTOToQuoted,
+                Integer vehicleVariationId,
+                List<OptionalDTOtoQuoted> optionalDTOtoQuoted,
+                BigDecimal finalPrice) {
 
 }

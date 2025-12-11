@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import org.lessons.vehicles.java.optionals.model.Optionals;
 import org.lessons.vehicles.java.vehicle.model.Vehicle;
+import org.lessons.vehicles.java.vehicleVariation.model.VehicleVariation;
 
 import jakarta.persistence.*;
 
@@ -19,9 +20,15 @@ public class Quoted {
     private BigDecimal finalPrice;
 
     @ManyToOne
+    @JoinColumn(name = "vehicle_id")
     private Vehicle vehicle;
 
-    @OneToMany(mappedBy = "quoted", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ManyToOne
+    @JoinColumn(name = "vehicle_variation_id")
+    private VehicleVariation vehicleVariation;
+
+    @ManyToMany
+    @JoinTable(name = "quoted_optionals", joinColumns = @JoinColumn(name = "quoted_id"), inverseJoinColumns = @JoinColumn(name = "optional_id"))
     private List<Optionals> optionals;
 
     public Integer getId() {
@@ -46,6 +53,14 @@ public class Quoted {
 
     public void setVehicle(Vehicle vehicle) {
         this.vehicle = vehicle;
+    }
+
+    public VehicleVariation getVehicleVariation() {
+        return this.vehicleVariation;
+    }
+
+    public void setVehicleVariation(VehicleVariation vehicleVariation) {
+        this.vehicleVariation = vehicleVariation;
     }
 
     public List<Optionals> getOptionals() {

@@ -8,13 +8,16 @@ import java.util.stream.Collectors;
 
 import org.lessons.vehicles.java.optionals.dto.OptionalDTOtoQuoted;
 import org.lessons.vehicles.java.optionals.model.Optionals;
+import org.lessons.vehicles.java.optionals.repository.OptionalsRepository;
 import org.lessons.vehicles.java.quoted.dto.QuotedDTO;
 import org.lessons.vehicles.java.quoted.model.Quoted;
 import org.lessons.vehicles.java.quoted.repository.QuotedRepository;
 import org.lessons.vehicles.java.vehicle.dto.VehicleDTOToQuoted;
 import org.lessons.vehicles.java.vehicle.model.Vehicle;
+import org.lessons.vehicles.java.vehicle.repository.VehicleRepository;
 import org.lessons.vehicles.java.vehicleVariation.dto.VehicleVariationDTO;
 import org.lessons.vehicles.java.vehicleVariation.model.VehicleVariation;
+import org.lessons.vehicles.java.vehicleVariation.repository.VehicleVariationRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
@@ -24,11 +27,20 @@ public class QuotedService {
 
     private final QuotedRepository quotedRepository;
     private final PriceCalculatorService priceCalculatorService;
+    private final VehicleRepository vehicleRepository;
+    private final OptionalsRepository optionalsRepository;
+    private final VehicleVariationRepository vehicleVariationRepository;
 
     public QuotedService(QuotedRepository quotedRepository,
-            PriceCalculatorService priceCalculatorService) {
+            PriceCalculatorService priceCalculatorService,
+            VehicleRepository vehicleRepository,
+            OptionalsRepository optionalsRepository,
+            VehicleVariationRepository vehicleVariationRepository) {
         this.quotedRepository = quotedRepository;
         this.priceCalculatorService = priceCalculatorService;
+        this.vehicleRepository = vehicleRepository;
+        this.optionalsRepository = optionalsRepository;
+        this.vehicleVariationRepository = vehicleVariationRepository;
     }
 
     public List<QuotedDTO> getAllQuoted() {
@@ -54,6 +66,7 @@ public class QuotedService {
 
     private VehicleVariationDTO toVariationDTO(VehicleVariation variation) {
         return new VehicleVariationDTO(
+                variation.getId(),
                 variation.getCc(),
                 variation.getImmatricolationMonth(),
                 variation.getImmatricolationYear(),
@@ -85,6 +98,7 @@ public class QuotedService {
                 : currentYear;
 
         if (immYear == currentYear) {
+            // Nessuna maggiorazione
         } else if (immYear >= currentYear - 2) {
             price = price.multiply(BigDecimal.valueOf(1.04));
         } else if (immYear >= currentYear - 4) {
@@ -100,7 +114,7 @@ public class QuotedService {
             case "diesel" -> price = price.multiply(BigDecimal.valueOf(1.03));
             case "electric" -> price = price.multiply(BigDecimal.valueOf(1.10));
             case "hybrid" -> price = price.multiply(BigDecimal.valueOf(1.05));
-            case "gpl" -> price = price.multiply(BigDecimal.valueOf(1.05));
+            case "gpl", "lpg" -> price = price.multiply(BigDecimal.valueOf(1.05));
             default -> {
             }
         }
@@ -112,19 +126,16 @@ public class QuotedService {
         BigDecimal total = BigDecimal.ZERO;
 
         Vehicle v = quoted.getVehicle();
-        if (v != null) {
-            if (v.getVehicleVariations() != null && !v.getVehicleVariations().isEmpty()) {
-                for (VehicleVariation variation : v.getVehicleVariations()) {
-                    VehicleVariationDTO varDTO = toVariationDTO(variation);
-                    total = total.add(calculateVehiclePrice(v, varDTO));
-                }
-            } else {
-                total = total.add(v.getBasePrice() != null
-                        ? v.getBasePrice()
-                        : BigDecimal.ZERO);
-            }
+        VehicleVariation selectedVariation = quoted.getVehicleVariation();
+
+        if (v != null && selectedVariation != null) {
+            VehicleVariationDTO varDTO = toVariationDTO(selectedVariation);
+            total = total.add(calculateVehiclePrice(v, varDTO));
+        } else if (v != null) {
+            total = total.add(v.getBasePrice() != null ? v.getBasePrice() : BigDecimal.ZERO);
         }
 
+        // Aggiungi il prezzo degli optionals
         if (quoted.getOptionals() != null) {
             for (Optionals o : quoted.getOptionals()) {
                 if (o.getPrice() != null) {
@@ -141,16 +152,11 @@ public class QuotedService {
             total = total.multiply(BigDecimal.valueOf(0.97));
         }
 
-        if (quoted.getVehicle() != null) {
-            Vehicle singleVehicle = quoted.getVehicle();
-            if (singleVehicle.getVehicleVariations() != null
-                    && !singleVehicle.getVehicleVariations().isEmpty()) {
-                VehicleVariation firstVariation = singleVehicle.getVehicleVariations().get(0);
-                if (firstVariation.getImmatricolationYear() != null
-                        && firstVariation.getImmatricolationYear() == Year.now().getValue()) {
-                    total = total.multiply(BigDecimal.valueOf(0.98));
-                }
-            }
+        // Sconto 2% se l'anno di immatricolazione è l'anno corrente
+        if (selectedVariation != null
+                && selectedVariation.getImmatricolationYear() != null
+                && selectedVariation.getImmatricolationYear() == Year.now().getValue()) {
+            total = total.multiply(BigDecimal.valueOf(0.98));
         }
 
         if (total.compareTo(BigDecimal.valueOf(20000)) > 0) {
@@ -178,9 +184,29 @@ public class QuotedService {
             return null;
         }
 
-        List<VehicleDTOToQuoted> vehicles = quoted.getVehicle() != null
-                ? List.of(this.toVehicleDTO(quoted.getVehicle()))
-                : List.of();
+        List<VehicleDTOToQuoted> vehicles = List.of();
+
+        if (quoted.getVehicle() != null) {
+            Vehicle vehicle = quoted.getVehicle();
+
+            List<VehicleVariationDTO> variationList = List.of();
+            if (quoted.getVehicleVariation() != null) {
+                variationList = List.of(toVariationDTO(quoted.getVehicleVariation()));
+            }
+
+            VehicleDTOToQuoted vehicleDTO = new VehicleDTOToQuoted(
+                    vehicle.getId(),
+                    vehicle.getBrand(),
+                    vehicle.getModel(),
+                    vehicle.getBasePrice(),
+                    variationList);
+
+            vehicles = List.of(vehicleDTO);
+        }
+
+        Integer vehicleVariationId = quoted.getVehicleVariation() != null
+                ? quoted.getVehicleVariation().getId()
+                : null;
 
         List<OptionalDTOtoQuoted> optionals = quoted.getOptionals() != null
                 ? quoted.getOptionals().stream()
@@ -190,7 +216,7 @@ public class QuotedService {
 
         BigDecimal finalPrice = calculateFinalPrice(quoted);
 
-        return new QuotedDTO(vehicles, optionals, finalPrice);
+        return new QuotedDTO(vehicles, vehicleVariationId, optionals, finalPrice);
     }
 
     private Quoted toEntity(QuotedDTO quotedDTO) {
@@ -199,12 +225,33 @@ public class QuotedService {
         if (quotedDTO.vehicleDTOToQuoted() != null && !quotedDTO.vehicleDTOToQuoted().isEmpty()) {
             VehicleDTOToQuoted vDTO = quotedDTO.vehicleDTOToQuoted().get(0);
 
-            Vehicle vehicle = new Vehicle();
-            vehicle.setId(vDTO.id());
-            vehicle.setBrand(vDTO.brand());
-            vehicle.setModel(vDTO.model());
-            vehicle.setBasePrice(vDTO.basePrice());
+            Vehicle vehicle = vehicleRepository.findById(vDTO.id())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                            "Vehicle not found with id: " + vDTO.id()));
+
             quoted.setVehicle(vehicle);
+        }
+
+        if (quotedDTO.vehicleVariationId() != null) {
+            VehicleVariation variation = vehicleVariationRepository.findById(quotedDTO.vehicleVariationId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                            "Vehicle variation not found with id: " + quotedDTO.vehicleVariationId()));
+
+            quoted.setVehicleVariation(variation);
+        }
+
+        if (quotedDTO.optionalDTOtoQuoted() != null && !quotedDTO.optionalDTOtoQuoted().isEmpty()) {
+            List<Optionals> optionals = new ArrayList<>();
+
+            for (OptionalDTOtoQuoted oDTO : quotedDTO.optionalDTOtoQuoted()) {
+                Optionals optional = optionalsRepository.findById(oDTO.id())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                "Optional not found with id: " + oDTO.id()));
+
+                optionals.add(optional);
+            }
+
+            quoted.setOptionals(optionals);
         }
 
         return quoted;
@@ -239,22 +286,36 @@ public class QuotedService {
         if (quotedDTO.vehicleDTOToQuoted() != null && !quotedDTO.vehicleDTOToQuoted().isEmpty()) {
             VehicleDTOToQuoted vDTO = quotedDTO.vehicleDTOToQuoted().get(0);
 
-            if (existingQuoted.getVehicle() != null && existingQuoted.getVehicle().getId().equals(vDTO.id())) {
-                existingQuoted.getVehicle().setBrand(vDTO.brand());
-                existingQuoted.getVehicle().setModel(vDTO.model());
-                existingQuoted.getVehicle().setBasePrice(vDTO.basePrice());
-            } else if (existingQuoted.getVehicle() == null) {
-            }
+            Vehicle vehicle = vehicleRepository.findById(vDTO.id())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                            "Vehicle not found with id: " + vDTO.id()));
+
+            existingQuoted.setVehicle(vehicle);
         }
 
-        if (quotedDTO.optionalDTOtoQuoted() != null) {
-            for (OptionalDTOtoQuoted oDTO : quotedDTO.optionalDTOtoQuoted()) {
-                existingQuoted.getOptionals().stream()
-                        .filter(o -> o.getId().equals(oDTO.id()))
-                        .findFirst()
-                        .ifPresent(o -> o.setPrice(oDTO.price()));
-            }
+        if (quotedDTO.vehicleVariationId() != null) {
+            VehicleVariation variation = vehicleVariationRepository.findById(quotedDTO.vehicleVariationId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                            "Vehicle variation not found with id: " + quotedDTO.vehicleVariationId()));
+
+            existingQuoted.setVehicleVariation(variation);
         }
+
+        if (quotedDTO.optionalDTOtoQuoted() != null && !quotedDTO.optionalDTOtoQuoted().isEmpty()) {
+            List<Optionals> optionals = new ArrayList<>();
+
+            for (OptionalDTOtoQuoted oDTO : quotedDTO.optionalDTOtoQuoted()) {
+                Optionals optional = optionalsRepository.findById(oDTO.id())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                                "Optional not found with id: " + oDTO.id()));
+
+                optionals.add(optional);
+            }
+
+            existingQuoted.setOptionals(optionals);
+        }
+
+        existingQuoted.setFinalPrice(calculateFinalPrice(existingQuoted));
 
         Quoted savedQuoted = quotedRepository.save(existingQuoted);
 
