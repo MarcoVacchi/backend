@@ -15,5 +15,9 @@ public record QuotedDTO(
         List<VehicleDTOToQuoted> vehicleDTOToQuoted,
         Integer vehicleVariationId,
         List<OptionalDTOtoQuoted> optionalDTOtoQuoted,
-        BigDecimal finalPrice) {
+        BigDecimal finalPrice,
+        // LA NUOVA LISTA VA QUI, DENTRO LE TONDE:
+        List<PriceAdjustment> priceAdjustments 
+) {
+    // Le parentesi graffe rimangono vuote se non hai costruttori personalizzati o metodi extra
 }

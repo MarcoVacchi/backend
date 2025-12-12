@@ -52,21 +52,24 @@ public class QuotedRestController {
     @GetMapping("/{id}/pdf")
     public ResponseEntity<byte[]> downloadQuotedPdf(@PathVariable Integer id) {
 
-        // 1. Recupera il DTO del preventivo tramite ID
+        // 1. Recupera il DTO
         QuotedDTO quoted = quotedService.getQuotedById(id);
 
-        // 2. Genera il PDF passando il DTO al Service
+        // 2. Genera il PDF
         byte[] pdfBytes = pdfService.generateQuotedPdf(quoted);
 
-        // Genera un nome file significativo (es. preventivo_Mario_Rossi_123.pdf)
-        String filename = String.format("preventivo_%s_%s.pdf",
-                quoted.userName(),
-                id);
+        // Pulizia nome file: sostituiamo gli spazi con underscore per evitare errori nei browser
+        String safeUserName = quoted.userName() != null ? quoted.userName().replace(" ", "_") : "Cliente";
+        String filename = String.format("preventivo_%s_%d.pdf", safeUserName, id);
 
-        // 3. Imposta gli Headers HTTP (come nel tuo PdfRestController)
+        // 3. Imposta gli Headers corretti
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
-        headers.setContentDispositionFormData(filename, filename);
+        
+        // USA "inline" se vuoi che il PDF si apra nel browser.
+        // USA "attachment" se vuoi che venga scaricato forzatamente.
+        headers.add(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=" + filename);
+        
         headers.setContentLength(pdfBytes.length);
 
         return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
