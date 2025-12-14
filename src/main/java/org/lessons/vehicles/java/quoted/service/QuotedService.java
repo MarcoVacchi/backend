@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
 import org.lessons.vehicles.java.optionals.dto.OptionalDTOtoQuoted;
 import org.lessons.vehicles.java.optionals.model.Optionals;
 import org.lessons.vehicles.java.optionals.repository.OptionalsRepository;
-import org.lessons.vehicles.java.quoted.dto.PriceAdjustment; // <--- FONDAMENTALE PER IL PDF
+import org.lessons.vehicles.java.quoted.dto.PriceAdjustment;
 import org.lessons.vehicles.java.quoted.dto.QuotedDTO;
 import org.lessons.vehicles.java.quoted.model.Quoted;
 import org.lessons.vehicles.java.quoted.repository.QuotedRepository;
@@ -56,8 +56,11 @@ public class QuotedService {
                 .collect(Collectors.toList());
     }
 
+    // Nota: Ho mantenuto il metodo che cerca per email, adattandolo al campo corretto
     public List<QuotedDTO> getQuotedByUserMail(String email) {
-        List<Quoted> quotedEntities = quotedRepository.findByUserMail(email);
+        // Verifica se nel repository il metodo si chiama findByUserEmail o findByUserMail
+        // Se ti da errore qui, cambia in findByUserMail
+        List<Quoted> quotedEntities = quotedRepository.findByUserEmail(email);
 
         if (quotedEntities.isEmpty()) {
             return List.of();
@@ -67,28 +70,29 @@ public class QuotedService {
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
+    
+    public QuotedDTO getQuotedById(Integer id) {
+        Quoted quoted = quotedRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Quotation not found with id: " + id));
+        return toDTO(quoted);
+    }
 
-    // --- METODI DI CALCOLO (AGGIORNATI PER PDF) ---
+    // --- METODI DI CALCOLO UNIFICATI ---
 
-    /**
-     * Calcola il prezzo finale e popola la lista adjustments per il PDF.
-     */
     private BigDecimal calculateFinalPrice(Quoted quoted, List<PriceAdjustment> adjustments) {
         BigDecimal total = BigDecimal.ZERO;
 
         Vehicle v = quoted.getVehicle();
         VehicleVariation selectedVariation = quoted.getVehicleVariation();
 
-        // 1. Prezzo Veicolo Base + Variazioni (Delega al PriceCalculatorService)
+        // 1. Prezzo Veicolo Base + Variazioni
         if (v != null) {
             VehicleVariationDTO varDTO = selectedVariation != null ? toVariationDTO(selectedVariation) : null;
-            // Nota: Assicurati che PriceCalculatorService accetti la lista come terzo parametro!
-            // Se PriceCalculatorService è stato revertato, potrebbe dare errore qui.
-            // Nel caso, fammelo sapere.
             total = priceCalculatorService.calculateVehiclePrice(v, varDTO, adjustments);
         }
 
-        // 2. Aggiunta Optionals (Semplice somma)
+        // 2. Aggiunta Optionals
         if (quoted.getOptionals() != null) {
             for (Optionals o : quoted.getOptionals()) {
                 if (o.getPrice() != null) {
@@ -97,18 +101,16 @@ public class QuotedService {
             }
         }
 
-        // --- APPLICAZIONE SCONTI E REGOLE (CON TRACCIAMENTO) ---
-
-        // Regola: Sconto se ci sono 3 o più optional
+        // 3. Sconto 3+ Optionals
         int optionalCount = quoted.getOptionals() != null ? quoted.getOptionals().size() : 0;
         if (optionalCount >= 3) {
             BigDecimal discountedTotal = total.multiply(BigDecimal.valueOf(0.97));
-            BigDecimal discountAmount = discountedTotal.subtract(total); // Sarà negativo
+            BigDecimal discountAmount = discountedTotal.subtract(total);
             adjustments.add(new PriceAdjustment("Sconto Pacchetto Optionals (3+)", discountAmount));
             total = discountedTotal;
         }
 
-        // Regola: Sconto Immatricolazione anno corrente
+        // 4. Sconto Immatricolazione Anno Corrente
         if (selectedVariation != null
                 && selectedVariation.getImmatricolationYear() != null
                 && selectedVariation.getImmatricolationYear() == Year.now().getValue()) {
@@ -118,24 +120,19 @@ public class QuotedService {
             total = discountedTotal;
         }
 
-        // Regola: Luxury Tax / Sconto sopra i 20k
+        // 5. Luxury Tax / Sconto > 20k
         if (total.compareTo(BigDecimal.valueOf(20000)) > 0) {
             BigDecimal excess = total.subtract(BigDecimal.valueOf(20000));
-            // Sconto del 5% sull'eccedenza
             BigDecimal discountAmount = excess.multiply(BigDecimal.valueOf(0.05)).negate();
             adjustments.add(new PriceAdjustment("Sconto su importo eccedente €20.000", discountAmount));
             total = total.add(discountAmount);
         }
 
-        // Regola: Sconto Pacchetto Comfort (Clima + Nav)
-        boolean hasClimatizzatore = quoted.getOptionals() != null
-                && quoted.getOptionals().stream()
-                        .anyMatch(o -> "climatizzatore".equalsIgnoreCase(o.getNameIt())
-                                || "air conditioning".equalsIgnoreCase(o.getNameEn()));
-        boolean hasNavigatore = quoted.getOptionals() != null
-                && quoted.getOptionals().stream()
-                        .anyMatch(o -> "navigatore".equalsIgnoreCase(o.getNameIt())
-                                || "navigator".equalsIgnoreCase(o.getNameEn()));
+        // 6. Pacchetto Comfort
+        boolean hasClimatizzatore = quoted.getOptionals() != null && quoted.getOptionals().stream()
+                .anyMatch(o -> "climatizzatore".equalsIgnoreCase(o.getNameIt()) || "air conditioning".equalsIgnoreCase(o.getNameEn()));
+        boolean hasNavigatore = quoted.getOptionals() != null && quoted.getOptionals().stream()
+                .anyMatch(o -> "navigatore".equalsIgnoreCase(o.getNameIt()) || "navigator".equalsIgnoreCase(o.getNameEn()));
 
         if (hasClimatizzatore && hasNavigatore) {
             BigDecimal discountAmount = BigDecimal.valueOf(-100);
@@ -143,18 +140,25 @@ public class QuotedService {
             total = total.add(discountAmount);
         }
 
+        // 7. Sconto Primo Preventivo (Logica del collega INTEGRATA col PDF)
+        boolean isFirstQuotation = quoted.getUser() != null && Boolean.TRUE.equals(quoted.getUser().getIsFirstQuotation());
+
+        if (isFirstQuotation) {
+            BigDecimal discountedTotal = total.multiply(BigDecimal.valueOf(0.98)); // 2% di sconto
+            BigDecimal discountAmount = discountedTotal.subtract(total);
+            adjustments.add(new PriceAdjustment("Sconto Benvenuto (Primo Preventivo)", discountAmount));
+            total = discountedTotal;
+        }
+
         return total;
     }
 
-    public QuotedDTO toDTO(Quoted quoted) {
-        if (quoted == null) {
-            return null;
-        }
-        
-        // 1. Preparo la lista per il PDF
-        List<PriceAdjustment> adjustments = new ArrayList<>();
+    // --- MAPPING DTO ---
 
-        // 2. Calcolo il prezzo riempiendo la lista
+    public QuotedDTO toDTO(Quoted quoted) {
+        if (quoted == null) return null;
+        
+        List<PriceAdjustment> adjustments = new ArrayList<>();
         BigDecimal finalPrice = calculateFinalPrice(quoted, adjustments);
 
         Integer id = quoted.getId();
@@ -165,63 +169,57 @@ public class QuotedService {
         String userEmail = quoted.getUser() != null ? quoted.getUser().getEmail() : null;
 
         List<VehicleDTOToQuoted> vehicles = List.of();
-
         if (quoted.getVehicle() != null) {
             Vehicle vehicle = quoted.getVehicle();
             List<VehicleVariationDTO> variationList = List.of();
             if (quoted.getVehicleVariation() != null) {
                 variationList = List.of(toVariationDTO(quoted.getVehicleVariation()));
             }
-
-            VehicleDTOToQuoted vehicleDTO = new VehicleDTOToQuoted(
-                    vehicle.getId(),
-                    vehicle.getBrand(),
-                    vehicle.getModel(),
-                    vehicle.getBasePrice(),
-                    variationList);
-
-            vehicles = List.of(vehicleDTO);
+            vehicles = List.of(new VehicleDTOToQuoted(vehicle.getId(), vehicle.getBrand(), vehicle.getModel(), vehicle.getBasePrice(), variationList));
         }
 
-        Integer vehicleVariationId = quoted.getVehicleVariation() != null
-                ? quoted.getVehicleVariation().getId()
-                : null;
+        Integer vehicleVariationId = quoted.getVehicleVariation() != null ? quoted.getVehicleVariation().getId() : null;
 
         List<OptionalDTOtoQuoted> optionals = quoted.getOptionals() != null
-                ? quoted.getOptionals().stream()
-                        .map(this::toOptionalDTO)
-                        .collect(Collectors.toList())
+                ? quoted.getOptionals().stream().map(this::toOptionalDTO).collect(Collectors.toList())
                 : List.of();
 
-        // 3. Creo il DTO passando anche adjustments alla fine
         return new QuotedDTO(id, userId, userName, userSurname, userMail, userEmail, vehicles, vehicleVariationId,
-                optionals,
-                finalPrice, 
-                adjustments); // <--- L'ULTIMO PEZZO MANCANTE
+                optionals, finalPrice, adjustments);
     }
 
-    // --- METODI DI CREAZIONE/AGGIORNAMENTO ---
+    // --- CREAZIONE E UPDATE (UNIFICATI) ---
 
     public QuotedDTO createQuoted(QuotedDTO quotedDTO) {
         Quoted newQuoted = toEntity(quotedDTO);
 
-        // Uso una lista temporanea perché qui serve solo calcolare il totale per il DB
+        // Controllo se è il primo preventivo PRIMA di salvare
+        boolean wasFirstQuotation = newQuoted.getUser() != null && Boolean.TRUE.equals(newQuoted.getUser().getIsFirstQuotation());
+
         List<PriceAdjustment> tempAdjustments = new ArrayList<>();
         newQuoted.setFinalPrice(calculateFinalPrice(newQuoted, tempAdjustments));
 
         Quoted savedQuoted = quotedRepository.save(newQuoted);
+
+        // Logica del collega: Se era il primo, ora non lo è più
+        if (wasFirstQuotation && savedQuoted.getUser() != null) {
+            User user = savedQuoted.getUser();
+            user.setIsFirstQuotation(false);
+            userRepository.save(user);
+        }
 
         return toDTO(savedQuoted);
     }
 
     public QuotedDTO updateQuoted(Integer id, QuotedDTO quotedDTO) {
         Quoted existingQuoted = quotedRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Quotation not found with id: " + id));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Quotation not found with id: " + id));
 
+        // Aggiornamento Utente
         if (quotedDTO.userId() != null) {
             User user = userRepository.findById(quotedDTO.userId())
                     .orElseGet(() -> {
+                        // Logica fallback creazione utente
                         User newUser = new User();
                         newUser.setName(quotedDTO.userName() != null ? quotedDTO.userName() : "default");
                         newUser.setSurname(quotedDTO.userSurname() != null ? quotedDTO.userSurname() : "default");
@@ -234,50 +232,38 @@ public class QuotedService {
             existingQuoted.setUser(user);
         }
 
-        if (existingQuoted.getOptionals() == null) {
-            existingQuoted.setOptionals(new ArrayList<>());
-        }
-
+        // Aggiornamento Veicolo
         if (quotedDTO.vehicleDTOToQuoted() != null && !quotedDTO.vehicleDTOToQuoted().isEmpty()) {
             VehicleDTOToQuoted vDTO = quotedDTO.vehicleDTOToQuoted().get(0);
             Vehicle vehicle = vehicleRepository.findById(vDTO.id())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                            "Vehicle not found with id: " + vDTO.id()));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Vehicle not found"));
             existingQuoted.setVehicle(vehicle);
         }
 
+        // Aggiornamento Variazione
         if (quotedDTO.vehicleVariationId() != null) {
             VehicleVariation variation = vehicleVariationRepository.findById(quotedDTO.vehicleVariationId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                            "Vehicle variation not found with id: " + quotedDTO.vehicleVariationId()));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Variation not found"));
             existingQuoted.setVehicleVariation(variation);
         }
 
-        if (quotedDTO.optionalDTOtoQuoted() != null) { // Nota: ho tolto il controllo isEmpty per permettere di svuotare gli optional
+        // Aggiornamento Optionals
+        if (quotedDTO.optionalDTOtoQuoted() != null) {
             List<Optionals> optionals = new ArrayList<>();
             for (OptionalDTOtoQuoted oDTO : quotedDTO.optionalDTOtoQuoted()) {
                 Optionals optional = optionalsRepository.findById(oDTO.id())
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                                "Optional not found with id: " + oDTO.id()));
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Optional not found"));
                 optionals.add(optional);
             }
             existingQuoted.setOptionals(optionals);
         }
 
-        // Ricalcolo prezzo e salvo
+        // Ricalcolo
         List<PriceAdjustment> tempAdjustments = new ArrayList<>();
         existingQuoted.setFinalPrice(calculateFinalPrice(existingQuoted, tempAdjustments));
 
         Quoted savedQuoted = quotedRepository.save(existingQuoted);
-
         return toDTO(savedQuoted);
-    }
-
-    public QuotedDTO getQuotedById(Integer id) {
-        Quoted quoted = quotedRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Quotation not found with id: " + id));
-        return toDTO(quoted);
     }
 
     // --- HELPER DI MAPPING ---
@@ -295,48 +281,59 @@ public class QuotedService {
 
     private OptionalDTOtoQuoted toOptionalDTO(Optionals optional) {
         if (optional == null) return null;
-
-        // L'errore era qui: stavi calcolando 'finalName' e passavi solo 3 dati.
-        // Invece devi passare TUTTI e 6 i dati che il tuo DTO si aspetta.
-        
         return new OptionalDTOtoQuoted(
-                optional.getId(),             // 1. ID
-                optional.getVehicleTypeIt(),  // 2. Tipo Veicolo IT
-                optional.getVehicleTypeEn(),  // 3. Tipo Veicolo EN
-                optional.getNameIt(),         // 4. Nome IT (es. "Bauletto")
-                optional.getNameEn(),         // 5. Nome EN
-                optional.getPrice()           // 6. Prezzo
+                optional.getId(),
+                optional.getVehicleTypeIt(), 
+                optional.getVehicleTypeEn(), 
+                optional.getNameIt(),        
+                optional.getNameEn(),        
+                optional.getPrice()
         );
     }
     
+    // Ho mantenuto la versione "avanzata" del toEntity del tuo collega che gestisce meglio l'utente
     private Quoted toEntity(QuotedDTO quotedDTO) {
         Quoted quoted = new Quoted();
 
         if (quotedDTO.userMail() != null || quotedDTO.userName() != null) {
-            User user = new User();
-            user.setName(quotedDTO.userName() != null ? quotedDTO.userName() : "default");
-            user.setSurname(quotedDTO.userSurname() != null ? quotedDTO.userSurname() : "default");
-            user.setMail(quotedDTO.userMail() != null ? quotedDTO.userMail() : "noemail-" + UUID.randomUUID());
-            user.setEmail(quotedDTO.userEmail() != null ? quotedDTO.userEmail() : "noemail-" + UUID.randomUUID());
-            user.setPassword("temporary");
-            user.setIsFirstQuotation(true);
-
-            user = userRepository.save(user);
+            User user;
+            // Usa l'email per cercare l'utente se presente
+            if (quotedDTO.userEmail() != null) {
+                user = userRepository.findByEmail(quotedDTO.userEmail())
+                        .orElseGet(() -> {
+                            User newUser = new User();
+                            newUser.setName(quotedDTO.userName() != null ? quotedDTO.userName() : "default");
+                            newUser.setSurname(quotedDTO.userSurname() != null ? quotedDTO.userSurname() : "default");
+                            newUser.setMail(quotedDTO.userMail() != null ? quotedDTO.userMail() : quotedDTO.userEmail());
+                            newUser.setEmail(quotedDTO.userEmail());
+                            newUser.setPassword("temporary");
+                            newUser.setIsFirstQuotation(true);
+                            return userRepository.save(newUser);
+                        });
+            } else {
+                // Fallback vecchio stile
+                user = new User();
+                user.setName(quotedDTO.userName() != null ? quotedDTO.userName() : "default");
+                user.setSurname(quotedDTO.userSurname() != null ? quotedDTO.userSurname() : "default");
+                user.setMail("noemail-" + UUID.randomUUID());
+                user.setEmail("noemail-" + UUID.randomUUID());
+                user.setPassword("temporary");
+                user.setIsFirstQuotation(true);
+                user = userRepository.save(user);
+            }
             quoted.setUser(user);
         }
 
         if (quotedDTO.vehicleDTOToQuoted() != null && !quotedDTO.vehicleDTOToQuoted().isEmpty()) {
             VehicleDTOToQuoted vDTO = quotedDTO.vehicleDTOToQuoted().get(0);
             Vehicle vehicle = vehicleRepository.findById(vDTO.id())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                            "Vehicle not found with id: " + vDTO.id()));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Vehicle not found"));
             quoted.setVehicle(vehicle);
         }
 
         if (quotedDTO.vehicleVariationId() != null) {
             VehicleVariation variation = vehicleVariationRepository.findById(quotedDTO.vehicleVariationId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                            "Vehicle variation not found with id: " + quotedDTO.vehicleVariationId()));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Variation not found"));
             quoted.setVehicleVariation(variation);
         }
 
@@ -344,8 +341,7 @@ public class QuotedService {
             List<Optionals> optionals = new ArrayList<>();
             for (OptionalDTOtoQuoted oDTO : quotedDTO.optionalDTOtoQuoted()) {
                 Optionals optional = optionalsRepository.findById(oDTO.id())
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                                "Optional not found with id: " + oDTO.id()));
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Optional not found"));
                 optionals.add(optional);
             }
             quoted.setOptionals(optionals);

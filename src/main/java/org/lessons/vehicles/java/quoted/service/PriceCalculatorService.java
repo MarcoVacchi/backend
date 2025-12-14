@@ -12,15 +12,16 @@ import org.springframework.stereotype.Service;
 public class PriceCalculatorService {
 
     // Aggiungi il parametro 'adjustments' dove salveremo la storia del prezzo
-    public BigDecimal calculateVehiclePrice(Vehicle vehicle, VehicleVariationDTO variation, List<PriceAdjustment> adjustments) {
-        
+    public BigDecimal calculateVehiclePrice(Vehicle vehicle, VehicleVariationDTO variation,
+            List<PriceAdjustment> adjustments) {
+
         BigDecimal price = vehicle.getBasePrice() != null ? vehicle.getBasePrice() : BigDecimal.ZERO;
 
         // 1. CILINDRATA
         int cc = variation != null && variation.cc() != null ? variation.cc() : 0;
         int extraBlocks = Math.max(0, (cc - 1000) / 500);
         BigDecimal ccMultiplier = BigDecimal.valueOf(1 + 0.05 * extraBlocks);
-        
+
         if (ccMultiplier.compareTo(BigDecimal.ONE) > 0) {
             BigDecimal increasedPrice = price.multiply(ccMultiplier);
             BigDecimal diff = increasedPrice.subtract(price);
@@ -30,7 +31,8 @@ public class PriceCalculatorService {
 
         // 2. ANNO IMMATRICOLAZIONE
         int currentYear = Year.now().getValue();
-        int immYear = variation != null && variation.immatricolationYear() != null ? variation.immatricolationYear() : currentYear;
+        int immYear = variation != null && variation.immatricolationYear() != null ? variation.immatricolationYear()
+                : currentYear;
         BigDecimal yearMultiplier = BigDecimal.ONE;
 
         if (immYear < currentYear) { // Solo se diverso dall'anno corrente
@@ -54,8 +56,10 @@ public class PriceCalculatorService {
         }
 
         // 3. ALIMENTAZIONE
-        String fuelEn = variation != null && variation.fuelSystemEn() != null ? variation.fuelSystemEn().toLowerCase() : "";
-        String fuelIt = variation != null && variation.fuelSystemIt() != null ? variation.fuelSystemIt().toLowerCase() : "";
+        String fuelEn = variation != null && variation.fuelSystemEn() != null ? variation.fuelSystemEn().toLowerCase()
+                : "";
+        String fuelIt = variation != null && variation.fuelSystemIt() != null ? variation.fuelSystemIt().toLowerCase()
+                : "";
         BigDecimal fuelMultiplier = BigDecimal.ONE;
         String fuelLabel = "";
 
