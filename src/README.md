@@ -110,9 +110,9 @@ Tracking: Salva "Maggiorazione Cilindrata (XXXXcc)" con differenza di prezzo
 3. Fattore Anzianità (Anno Immatricolazione)
 
 Anno corrente: nessuna maggiorazione (moltiplicatore 1.0)
-0-2 anni fa: +4% (moltiplicatore 1.04)
-3-4 anni fa: +8% (moltiplicatore 1.08)
-5+ anni fa: +12% (moltiplicatore 1.12)
+0-2 anni fa: -4% (moltiplicatore 0.96)
+3-4 anni fa: -8% (moltiplicatore 0.92)
+5+ anni fa: -12% (moltiplicatore 0.88)
 Tracking: Salva "Fattore Anzianità (anno)" solo se diverso dall'anno corrente
 
 4. Supplemento Alimentazione
